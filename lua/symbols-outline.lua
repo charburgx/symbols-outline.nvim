@@ -7,11 +7,12 @@ local writer = require 'symbols-outline.writer'
 local config = require 'symbols-outline.config'
 local utils = require 'symbols-outline.utils.init'
 local view = require 'symbols-outline.view'
+local folding = require 'symbols-outline.folding'
 
 local M = {}
 
 local function setup_global_autocmd()
-  if config.options.highlight_hovered_item then
+  if config.options.highlight_hovered_item or config.options.auto_unfold_hover then
     vim.cmd "au CursorHold * :lua require('symbols-outline')._highlight_current_item()"
   end
 end
@@ -39,6 +40,15 @@ local function wipe_state()
   M.state = { outline_items = {}, flattened_outline_items = {}, code_win = 0 }
 end
 
+local function _update_lines()
+  M.state.flattened_outline_items = parser.flatten(M.state.outline_items)
+  writer.parse_and_write(M.state.outline_buf, M.state.flattened_outline_items)
+end
+
+local function _did_items_change(items)
+  return not utils.table_deep_eq_exclude_keys(items, M.state.outline_items, { "parent", "folded", "hovered", "line_in_outline", "hierarchy" })
+end
+
 local function __refresh()
   if M.state.outline_buf ~= nil then
     local function refresh_handler(response)
@@ -48,11 +58,15 @@ local function __refresh()
 
       local items = parser.parse(response)
 
+      -- only update window when something changed
+      if config.options.only_reload_on_change and not _did_items_change(items) then
+        return
+      end
+
       M.state.code_win = vim.api.nvim_get_current_win()
       M.state.outline_items = items
-      M.state.flattened_outline_items = parser.flatten(items)
 
-      writer.parse_and_write(M.state.outline_buf, M.state.flattened_outline_items)
+      _update_lines()
     end
 
     providers.request_symbols(refresh_handler)
@@ -61,15 +75,39 @@ end
 
 M._refresh = utils.debounce(__refresh, 100)
 
-function M._goto_location(change_focus)
+function M._current_node()
   local current_line = vim.api.nvim_win_get_cursor(M.state.outline_win)[1]
-  local node = M.state.flattened_outline_items[current_line]
+  return M.state.flattened_outline_items[current_line]
+end
+
+function M._goto_location(change_focus)
+  local node = M._current_node()
   vim.api.nvim_win_set_cursor(M.state.code_win, { node.line + 1, node.character })
   if change_focus then
     vim.fn.win_gotoid(M.state.code_win)
   end
   if config.options.auto_close then
     M.close_outline()
+  end
+end
+
+function M._set_folded(folded, move_cursor, node_index)
+  local node = M.state.flattened_outline_items[node_index] or M._current_node()
+
+  if folding.is_foldable(node) then
+    node.folded = folded
+
+    if move_cursor then
+      vim.api.nvim_win_set_cursor(M.state.outline_win, { node_index, 0 })
+    end
+
+    _update_lines()
+  elseif node.parent then
+    for i, n in ipairs(M.state.flattened_outline_items) do
+      if n == node.parent then
+        M._set_folded(folded, not node.parent.folded and folded, i)
+      end
+    end
   end
 end
 
@@ -97,20 +135,17 @@ function M._highlight_current_item(winnr)
 
   local hovered_line = vim.api.nvim_win_get_cursor(win)[1] - 1
 
-  local nodes = {}
   for index, value in ipairs(M.state.flattened_outline_items) do
+    value.hovered = nil
+
     if value.line == hovered_line or (hovered_line > value.range_start and hovered_line < value.range_end) then
       value.line_in_outline = index
-      table.insert(nodes, value)
+      value.hovered = true
+      vim.api.nvim_win_set_cursor(M.state.outline_win, { index, 1 })
     end
   end
 
-  -- clear old highlight
-  ui.clear_hover_highlight(M.state.outline_buf)
-  for _, value in ipairs(nodes) do
-    ui.add_hover_highlight(M.state.outline_buf, value.line_in_outline - 1, value.depth * 2)
-    vim.api.nvim_win_set_cursor(M.state.outline_win, { value.line_in_outline, 1 })
-  end
+  _update_lines()
 end
 
 local function setup_keymaps(bufnr)
@@ -133,6 +168,10 @@ local function setup_keymaps(bufnr)
   map(config.options.keymaps.show_help, ":lua require('symbols-outline.config').show_help()<Cr>")
   -- close outline
   map(config.options.keymaps.close, ':bw!<Cr>')
+  -- fold selection
+  map(config.options.keymaps.fold, ":lua require('symbols-outline')._set_folded(true)<Cr>")
+  -- unfold selection
+  map(config.options.keymaps.unfold, ":lua require('symbols-outline')._set_folded(false)<Cr>")
 end
 
 local function handler(response)
