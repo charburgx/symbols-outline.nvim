@@ -111,6 +111,18 @@ function M._set_folded(folded, move_cursor, node_index)
   end
 end
 
+function M._set_all_folded(folded, nodes)
+  local is_root_exec = not nodes
+  nodes = nodes or M.state.outline_items
+
+  for _, node in ipairs(nodes) do
+    node.folded = folded
+    if node.children then M._set_all_folded(folded, node.children) end
+  end
+
+  _update_lines()
+end
+
 function M._highlight_current_item(winnr)
   local has_provider = providers.has_provider()
 
@@ -172,6 +184,12 @@ local function setup_keymaps(bufnr)
   map(config.options.keymaps.fold, ":lua require('symbols-outline')._set_folded(true)<Cr>")
   -- unfold selection
   map(config.options.keymaps.unfold, ":lua require('symbols-outline')._set_folded(false)<Cr>")
+  -- fold all
+  map(config.options.keymaps.fold_all, ":lua require('symbols-outline')._set_all_folded(true)<Cr>")
+  -- unfold all
+  map(config.options.keymaps.unfold_all, ":lua require('symbols-outline')._set_all_folded(false)<Cr>")
+  -- fold reset
+  map(config.options.keymaps.fold_reset, ":lua require('symbols-outline')._set_all_folded(nil)<Cr>")
 end
 
 local function handler(response)

@@ -30,7 +30,10 @@ M.defaults = {
     code_actions = 'a',
     show_help = '?',
     fold = 'h',
-    unfold = 'l'
+    unfold = 'l',
+    fold_all = 'W',
+    unfold_all = 'E',
+    fold_reset = 'R',
   },
   lsp_blacklist = {},
   symbol_blacklist = {},
