@@ -32,27 +32,53 @@ function M.debounce(f, delay)
   end
 end
 
----Determine if two deeply nested tables are deeply equal
----excluding on values indexed by "keys"
----@param a table
----@param b table
----@param keys table 
-function M.table_deep_eq_exclude_keys(a, b, keys)
-  if type(a) ~= type(b) then
-    return false
-  elseif type(a) == "table" then
-    for key, _ in pairs(a) do
-      if vim.tbl_contains(keys, key) then goto continue end
-      if not M.table_deep_eq_exclude_keys(a[key], b[key], keys) then 
-        return false
+---Merges a symbol tree recursively, only replacing nodes
+---which have changed. This will maintain the folding
+---status of any unchanged nodes.
+---@param new_node table New node
+---@param old_node table Old node
+---@param index? number Index of old_item in parent
+---@param parent? table Parent of old_item
+M.merge_items_rec = function(new_node, old_node, index, parent)
+  local failed = false
+
+  if not new_node or not old_node then
+    failed = true
+  else
+    for key, _ in pairs(new_node) do
+      if vim.tbl_contains({ "parent", "children", "folded", "hovered", "line_in_outline", "hierarchy" }, key) then goto continue end
+
+      if key == "name" then
+        -- in the case of a rename, just rename the existing node
+        old_node["name"] = new_node["name"]
+      else
+        if not vim.deep_equal(new_node[key], old_node[key]) then
+          failed = true
+          break
+        end
       end
+
       ::continue::
     end
-  else
-    return a == b
   end
+   
+  if failed then
+    if parent and index then parent[index] = new_node end
+  else
+    local next_new_item = new_node.children or { }
+    
+    -- in case new children are created on a node which
+    -- previously had no children
+    if #next_new_item > 0 and not old_node.children then
+      old_node.children = { }
+    end
 
-  return true
+    local next_old_item = old_node.children or { }
+
+    for i=1,math.max(#next_new_item, #next_old_item) do
+      M.merge_items_rec(next_new_item[i], next_old_item[i], i, next_old_item)
+    end
+  end
 end
 
 return M

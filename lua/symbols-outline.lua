@@ -45,8 +45,8 @@ local function _update_lines()
   writer.parse_and_write(M.state.outline_buf, M.state.flattened_outline_items)
 end
 
-local function _did_items_change(items)
-  return not utils.table_deep_eq_exclude_keys(items, M.state.outline_items, { "parent", "folded", "hovered", "line_in_outline", "hierarchy" })
+local function _merge_items(items)
+  utils.merge_items_rec({ children=items }, { children=M.state.outline_items})
 end
 
 local function __refresh()
@@ -58,13 +58,13 @@ local function __refresh()
 
       local items = parser.parse(response)
 
-      -- only update window when something changed
-      if config.options.only_reload_on_change and not _did_items_change(items) then
-        return
+      if config.options.only_reload_on_change then
+        _merge_items(items)
+      else
+        M.state.outline_items = items
       end
 
       M.state.code_win = vim.api.nvim_get_current_win()
-      M.state.outline_items = items
 
       _update_lines()
     end
