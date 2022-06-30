@@ -93,8 +93,9 @@ end
 
 function M._set_folded(folded, move_cursor, node_index)
   local node = M.state.flattened_outline_items[node_index] or M._current_node()
+  local changed = (folded ~= folding.is_folded(node))
 
-  if folding.is_foldable(node) then
+  if folding.is_foldable(node) and changed then
     node.folded = folded
 
     if move_cursor then
