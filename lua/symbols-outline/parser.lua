@@ -137,7 +137,9 @@ function M.parse(response)
     end
 
     local result = client_response['result']
-    if result == nil or type(result) ~= 'table' then goto continue end
+    if result == nil or type(result) ~= 'table' then
+      goto continue
+    end
 
     for _, value in pairs(result) do
       table.insert(all_results, value)
@@ -207,7 +209,7 @@ function M.get_lines(flattened_outline_items)
             else
               line[index] = config.options.fold_markers[2]
             end
-          -- the root level has no vertical markers
+            -- the root level has no vertical markers
           elseif depth > 1 then
             if value.isLast then
               line[index] = ui.markers.bottom
@@ -219,7 +221,7 @@ function M.get_lines(flattened_outline_items)
           -- vertical marker because there are items under us and we need
           -- to point to those
         elseif not value.hierarchy[index] and depth > 1 then
-          line[index+index_shift] = ui.markers.vertical
+          line[index + index_shift] = ui.markers.vertical
         end
       end
     end

@@ -57,12 +57,16 @@ local function clear_virt_text(bufnr)
 end
 
 M.add_hover_highlights = function(bufnr, nodes)
-  if not config.options.highlight_hovered_item then return end
+  if not config.options.highlight_hovered_item then
+    return
+  end
 
   -- clear old highlight
   ui.clear_hover_highlight(bufnr)
   for _, value in ipairs(nodes) do
-    if not value.hovered then goto continue end
+    if not value.hovered then
+      goto continue
+    end
     ui.add_hover_highlight(bufnr, value.line_in_outline - 1, value.depth * 2)
     ::continue::
   end

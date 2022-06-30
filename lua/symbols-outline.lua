@@ -46,7 +46,7 @@ local function _update_lines()
 end
 
 local function _merge_items(items)
-  utils.merge_items_rec({ children=items }, { children=M.state.outline_items})
+  utils.merge_items_rec({ children = items }, { children = M.state.outline_items })
 end
 
 local function __refresh()
@@ -118,7 +118,9 @@ function M._set_all_folded(folded, nodes)
 
   for _, node in ipairs(nodes) do
     node.folded = folded
-    if node.children then M._set_all_folded(folded, node.children) end
+    if node.children then
+      M._set_all_folded(folded, node.children)
+    end
   end
 
   _update_lines()

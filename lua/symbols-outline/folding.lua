@@ -1,7 +1,7 @@
 local M = {}
-local config = require"symbols-outline.config"
+local config = require 'symbols-outline.config'
 
-M.is_foldable = function (node)
+M.is_foldable = function(node)
   return node.children and #node.children > 0
 end
 
@@ -14,7 +14,7 @@ local get_default_folded = function(depth)
   end
 end
 
-M.is_folded = function (node)
+M.is_folded = function(node)
   if node.folded ~= nil then
     return node.folded
   elseif node.hovered and config.options.auto_unfold_hover then
