@@ -1,5 +1,6 @@
 local vim = vim
 
+local tsutils = require'nvim-treesitter.ts_utils'
 local parser = require 'symbols-outline.parser'
 local providers = require 'symbols-outline.providers.init'
 local ui = require 'symbols-outline.ui'
@@ -23,6 +24,8 @@ local function setup_buffer_autocmd()
   else
     vim.cmd "au CursorMoved <buffer> lua require'symbols-outline.preview'.close()"
   end
+
+  vim.cmd"au BufWinEnter,CursorMoved,BufWinLeave * :lua require('symbols-outline').update_scroll()"
 end
 
 -------------------------
@@ -74,6 +77,27 @@ local function __refresh()
 end
 
 M._refresh = utils.debounce(__refresh, 100)
+
+function M.update_scroll()
+  if not config.options.autoscroll then
+    return
+  end
+
+  local curr_win = vim.api.nvim_get_current_win()
+  -- local curr_buff = vim.api.nvim_win_get_buf(curr_win)
+  local bufnr = vim.api.nvim_win_get_buf(M.state.code_win)
+  vim.api.nvim_buf_clear_namespace(bufnr, ui.hovered_hl_ns, 0, -1)
+
+  if curr_win ~= M.state.outline_win then
+    -- do nothing
+  else
+    local node = M._current_node()
+    local range = { node.line, node.character, node.line_end, node.character_end }
+
+    tsutils.highlight_range(range, bufnr, ui.hovered_hl_ns, "TSPlaygroundFocus")
+    vim.api.nvim_win_set_cursor(M.state.code_win, { node.line + 1, node.character })
+  end
+end
 
 function M._current_node()
   local current_line = vim.api.nvim_win_get_cursor(M.state.outline_win)[1]

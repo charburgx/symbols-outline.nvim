@@ -54,6 +54,8 @@ local function parse_result(result, depth, hierarchy, parent)
         detail = value.detail,
         line = selectionRange.start.line,
         character = selectionRange.start.character,
+        line_end = selectionRange['end'].line,
+        character_end = selectionRange['end'].character,
         range_start = range.start.line,
         range_end = range['end'].line,
         depth = level,
