@@ -157,12 +157,17 @@ end
 
 function M.flatten(outline_items)
   local ret = {}
+  local index = 1
   for _, value in ipairs(outline_items) do
     table.insert(ret, value)
+    value.line_in_outline = index
+    index = index + 1
     if value.children ~= nil and not folding.is_folded(value) then
       local inner = M.flatten(value.children)
       for _, value_inner in ipairs(inner) do
         table.insert(ret, value_inner)
+        value_inner.line_in_outline = index
+        index = index + 1
       end
     end
   end

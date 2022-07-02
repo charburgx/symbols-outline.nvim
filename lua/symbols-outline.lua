@@ -25,7 +25,7 @@ local function setup_buffer_autocmd()
     vim.cmd "au CursorMoved <buffer> lua require'symbols-outline.preview'.close()"
   end
 
-  vim.cmd"au BufWinEnter,CursorMoved,BufWinLeave * :lua require('symbols-outline').update_scroll()"
+  vim.cmd"au CursorMoved * :lua require('symbols-outline').update_scroll()"
 end
 
 -------------------------
@@ -43,9 +43,17 @@ local function wipe_state()
   M.state = { outline_items = {}, flattened_outline_items = {}, code_win = 0 }
 end
 
-local function _update_lines()
+local function _flatten_items()
   M.state.flattened_outline_items = parser.flatten(M.state.outline_items)
+end
+
+local function _write_items()
   writer.parse_and_write(M.state.outline_buf, M.state.flattened_outline_items)
+end
+
+local function _update_lines()
+  _flatten_items()
+  _write_items()
 end
 
 local function _merge_items(items)
@@ -77,6 +85,7 @@ local function __refresh()
 end
 
 M._refresh = utils.debounce(__refresh, 100)
+-- M._refresh = __refresh
 
 function M.update_scroll()
   if not config.options.autoscroll then
@@ -92,6 +101,8 @@ function M.update_scroll()
     -- do nothing
   else
     local node = M._current_node()
+    if not node then return end
+
     local range = { node.line, node.character, node.line_end, node.character_end }
 
     tsutils.highlight_range(range, bufnr, ui.hovered_hl_ns, "TSPlaygroundFocus")
@@ -150,6 +161,18 @@ function M._set_all_folded(folded, nodes)
   _update_lines()
 end
 
+local function _items_dfs(callback, children)
+  children = children or M.state.outline_items
+
+  for _, val in ipairs(children) do
+    callback(val)
+
+    if val.children then
+      _items_dfs(callback, val.children)
+    end
+  end
+end
+
 function M._highlight_current_item(winnr)
   local has_provider = providers.has_provider()
 
@@ -174,17 +197,28 @@ function M._highlight_current_item(winnr)
 
   local hovered_line = vim.api.nvim_win_get_cursor(win)[1] - 1
 
-  for index, value in ipairs(M.state.flattened_outline_items) do
+  local leaf_node = nil
+
+  local cb = function(value)
     value.hovered = nil
 
     if value.line == hovered_line or (hovered_line > value.range_start and hovered_line < value.range_end) then
-      value.line_in_outline = index
       value.hovered = true
-      vim.api.nvim_win_set_cursor(M.state.outline_win, { index, 1 })
+      leaf_node = value
     end
   end
 
+  _items_dfs(cb)
+
   _update_lines()
+
+  if leaf_node then
+    for index, node in ipairs(M.state.flattened_outline_items) do
+      if node == leaf_node then
+          vim.api.nvim_win_set_cursor(M.state.outline_win, { index, 1 })
+      end
+    end
+  end
 end
 
 local function setup_keymaps(bufnr)
